@@ -1,0 +1,77 @@
+import numpy as np
+from sklearn.datasets import load_iris
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+np.random.seed(42)
+
+def one_hot(y, k):
+    m = y.shape[0]
+    out = np.zeros((m, k))
+    out[np.arange(m), y] = 1
+    return out
+
+iris = load_iris()
+X, y = iris.data, iris.target
+X = StandardScaler().fit_transform(X)
+Y = one_hot(y, 3)
+X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+
+n_x = X_train.shape[1]
+n_h = 10
+n_y = 3
+
+W1 = np.random.randn(n_h, n_x) * 0.01
+b1 = np.zeros((n_h, 1))
+W2 = np.random.randn(n_y, n_h) * 0.01
+b2 = np.zeros((n_y, 1))
+
+def softmax(z):
+    z = z - np.max(z, axis=0, keepdims=True)
+    e = np.exp(z)
+    return e / np.sum(e, axis=0, keepdims=True)
+
+def relu(z):
+    return np.maximum(0, z)
+
+def relu_deriv(z):
+    return (z > 0).astype(float)
+
+lr = 0.1
+epochs = 1000
+m = X_train.shape[0]
+
+for i in range(epochs):
+    Z1 = W1.dot(X_train.T) + b1
+    A1 = relu(Z1)
+    Z2 = W2.dot(A1) + b2
+    A2 = softmax(Z2)
+
+    loss = -np.sum(Y_train.T * np.log(A2 + 1e-12)) / m
+
+    dZ2 = A2 - Y_train.T
+    dW2 = (1 / m) * dZ2.dot(A1.T)
+    db2 = (1 / m) * np.sum(dZ2, axis=1, keepdims=True)
+
+    dA1 = W2.T.dot(dZ2)
+    dZ1 = dA1 * relu_deriv(Z1)
+    dW1 = (1 / m) * dZ1.dot(X_train)
+    db1 = (1 / m) * np.sum(dZ1, axis=1, keepdims=True)
+
+    W2 -= lr * dW2
+    b2 -= lr * db2
+    W1 -= lr * dW1
+    b1 -= lr * db1
+
+    if i % 100 == 0:
+        preds = np.argmax(A2, axis=0)
+        acc = np.mean(preds == np.argmax(Y_train, axis=1))
+        print(f"Epoch {i}, loss={loss:.4f}, train_acc={acc:.4f}")
+
+Z1_t = W1.dot(X_test.T) + b1
+A1_t = relu(Z1_t)
+Z2_t = W2.dot(A1_t) + b2
+A2_t = softmax(Z2_t)
+preds_test = np.argmax(A2_t, axis=0)
+acc_test = np.mean(preds_test == np.argmax(Y_test, axis=1))
+print(f"Test accuracy: {acc_test:.4f}")
